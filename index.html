@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blender 3D Studio - Hologram Autonomous Car Simulation</title>
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Three.js and OrbitControls Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+  <!-- App Header Toolbar -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-badge">BLENDER 3D</span>
+      <h1>DSA College &bull; Autonomous Car & Obstacle Avoidance Simulation</h1>
+    </div>
+
+    <div class="toolbar">
+      <div class="tool-group">
+        <span class="label">DRIVING MODE:</span>
+        <button class="btn btn-mode active" id="mode-manual">MANUAL [WASD]</button>
+        <button class="btn btn-mode" id="mode-autopilot">AUTOPILOT TOUR</button>
+      </div>
+
+      <div class="tool-group">
+        <span class="label">SHADING:</span>
+        <button class="btn btn-shading" data-shading="wireframe">WIREFRAME</button>
+        <button class="btn btn-shading" data-shading="solid">SOLID</button>
+        <button class="btn btn-shading" data-shading="material">MATERIAL</button>
+        <button class="btn btn-shading active" data-shading="rendered">RENDERED</button>
+      </div>
+
+      <div class="tool-group">
+        <span class="label">CAMERA:</span>
+        <button class="btn" id="cam-chase">CHASE CAM</button>
+        <button class="btn" id="cam-orbit">ORBIT CAM</button>
+        <button class="btn" id="view-reset">RESET</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Container -->
+  <main class="workspace">
+    
+    <!-- 3D Viewport Viewport Canvas -->
+    <div class="viewport-wrapper">
+      <canvas id="three-canvas"></canvas>
+
+      <!-- Viewport HUD Overlay -->
+      <div class="viewport-hud">
+        <span class="hud-tag">3D INTERACTIVE SIMULATION</span>
+        <span class="hud-sub" id="hud-controls-hint">Drive: WASD / Arrow Keys | Space: Handbrake</span>
+      </div>
+
+      <!-- Red Emergency Obstacle Warning Banner -->
+      <div class="obstacle-alert-banner" id="obstacle-alert-banner">
+        <span class="alert-icon">⚠️</span>
+        <div class="alert-text">
+          <span class="alert-title">OBSTACLE DETECTED AHEAD</span>
+          <span class="alert-sub">EMERGENCY BRAKES APPLIED &bull; VEHICLE STOPPED</span>
+        </div>
+      </div>
+
+      <!-- Speedometer Telemetry HUD -->
+      <div class="speedometer-hud" id="speedometer-container">
+        <div class="speed-gauge">
+          <span class="speed-value" id="speed-display">0</span>
+          <span class="speed-unit">KM/H</span>
+        </div>
+        <div class="gear-badge" id="gear-display">P</div>
+      </div>
+
+      <!-- Keyboard WASD Drive Legend -->
+      <div class="wasd-legend" id="wasd-legend">
+        <div class="key-row"><span class="key-cap">W</span><span>Drive Forward</span></div>
+        <div class="key-row"><span class="key-cap">S</span><span>Reverse / Brake</span></div>
+        <div class="key-row"><span class="key-cap">A</span><span class="key-cap">D</span><span>Steer Left / Right</span></div>
+        <div class="key-row"><span class="key-cap space">SPACEBAR</span><span>Handbrake</span></div>
+      </div>
+
+      <!-- On-Screen Touch/Mouse Drive Controls -->
+      <div class="touch-drive-bar">
+        <button class="btn-drive" id="btn-drive-fwd">▲ FORWARD [W]</button>
+        <div class="steer-group">
+          <button class="btn-drive" id="btn-drive-left">◄ LEFT [A]</button>
+          <button class="btn-drive btn-red" id="btn-drive-brake">■ BRAKE [SPACE]</button>
+          <button class="btn-drive" id="btn-drive-right">RIGHT [D] ►</button>
+        </div>
+        <button class="btn-drive" id="btn-drive-rev">▼ REVERSE [S]</button>
+      </div>
+
+      <!-- Live WebCam PIP Window -->
+      <div class="pip-window" id="pip-container">
+        <div class="pip-header">
+          <span>LIVE OPENCV CAMERA PIP</span>
+          <span class="pip-status" id="cam-status">ACTIVE</span>
+        </div>
+        <div class="pip-video-wrap">
+          <video id="webcam-video" autoplay playsinline muted></video>
+          <canvas id="detection-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar Controls & Outliner Panel -->
+    <aside class="sidebar-panel">
+      
+      <!-- Sidebar Navigation Tabs -->
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab-btn active" id="tab-btn-controls">🎮 CONTROLS &amp; Q&amp;A</button>
+        <button class="sidebar-tab-btn" id="tab-btn-inspector">⚙️ SCENE &amp; SPECS</button>
+      </div>
+
+      <!-- Tab Pane 1: Controls & Topics (Default Visible) -->
+      <div class="tab-pane active" id="pane-controls">
+        <!-- Hologram Speech & Q&A Topics -->
+        <div class="card">
+          <div class="card-header">
+            <h3>CAMPUS GUIDE &amp; VISITOR</h3>
+          </div>
+          <div class="card-body">
+
+            <!-- Visitor Status Badge -->
+            <div class="visitor-status-badge" id="visitor-status-badge" style="display: none;">
+              <span class="pulse-dot"></span>
+              <span class="visitor-status-text" id="visitor-status-text">Visitor approaching...</span>
+              <button class="btn-dismiss-visitor" id="btn-dismiss-visitor" title="Dismiss Visitor">✕</button>
+            </div>
+
+            <div class="topic-grid">
+              <button class="btn btn-topic" data-topic="Admissions" tabindex="0">🎓 Admissions</button>
+              <button class="btn btn-topic" data-topic="Departments" tabindex="0">🏫 Departments</button>
+              <button class="btn btn-topic" data-topic="Student Projects" tabindex="0">🔧 Projects</button>
+              <button class="btn btn-topic" data-topic="Campus Tour" tabindex="0">🗺️ Campus Tour</button>
+              <button class="btn btn-topic" data-topic="AI & Robotics" tabindex="0">🤖 AI &amp; Robotics</button>
+              <button class="btn btn-topic" data-topic="Contact Us" tabindex="0">📞 Contact Us</button>
+            </div>
+
+            <div class="response-box">
+              <span class="response-label">HOLOGRAM SPEECH RESPONSE:</span>
+              <p id="speech-response-text">Use WASD to drive. Forward obstacle sensor is active.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision & Voice Action Controls -->
+        <div class="card">
+          <div class="card-header">
+            <h3>SIMULATION CONTROLS</h3>
+          </div>
+          <div class="card-body">
+            <div class="action-grid">
+              <button class="btn btn-action btn-visitor" id="btn-trigger-visitor" tabindex="0">🚶 SIMULATE VISITOR</button>
+              <button class="btn btn-action btn-red" id="btn-spawn-obstacle" tabindex="0">🚧 SPAWN OBSTACLE</button>
+              <button class="btn btn-action btn-orange" id="btn-clear-obstacles" tabindex="0">🧹 CLEAR OBSTACLES</button>
+              <button class="btn btn-action" id="btn-toggle-cam" tabindex="0">📷 CAM MODE [C]</button>
+              <button class="btn btn-action btn-orange" id="btn-listen-mic" tabindex="0">🎤 LISTEN MIC [M]</button>
+              <button class="btn btn-action" id="btn-toggle-tts" tabindex="0">🔊 TTS: ON [T]</button>
+              <button class="btn btn-action btn-full" id="btn-toggle-power" tabindex="0">⚡ DISPLAY POWER [H]</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Pane 2: Scene & Properties (Secondary Tab) -->
+      <div class="tab-pane" id="pane-inspector" style="display: none;">
+        <!-- Scene Outliner Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>SCENE OUTLINER</h3>
+          </div>
+          <div class="card-body">
+            <ul class="outliner-list" id="outliner-list">
+              <li class="active" data-obj="Autonomous_Car">🚗 Autonomous_Car</li>
+              <li data-obj="Hologram_Fan_Rig">🌀 Hologram_Fan_Rig</li>
+              <li data-obj="Laser_Sensor_Beam">🔴 Laser_Sensor_Beam</li>
+              <li data-obj="Admissions_Building">🏛️ Admissions_Building</li>
+              <li data-obj="Engineering_Hub">🏫 Engineering_Hub</li>
+              <li data-obj="AI_Robotics_Center">🔬 AI_Robotics_Center</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Object Transform Properties Inspector -->
+        <div class="card">
+          <div class="card-header">
+            <h3>PROPERTIES INSPECTOR</h3>
+          </div>
+          <div class="card-body">
+            <div class="property-group">
+              <label>Selected Object:</label>
+              <span class="value-highlight" id="selected-obj-name">Autonomous_Car</span>
+            </div>
+
+            <div class="property-group">
+              <label>Obstacle Sensor Distance:</label>
+              <span class="value-highlight" id="sensor-distance-val">CLEAR (>10m)</span>
+            </div>
+
+            <div class="property-group">
+              <label>Paint Color Theme:</label>
+              <select id="color-selector" class="select-input">
+                <option value="cyan">Cyan Metallic</option>
+                <option value="chrome">Silver Chrome</option>
+                <option value="orange">Neon Orange</option>
+                <option value="stealth">Stealth Dark</option>
+              </select>
+            </div>
+
+            <div class="property-group">
+              <label>Vehicle Location (X, Y, Z):</label>
+              <div class="coord-inputs">
+                <span id="pos-x">X: 0.0</span>
+                <span id="pos-y">Y: 0.0</span>
+                <span id="pos-z">Z: 0.0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Bottom Diagnostic Log Console -->
+  <footer class="log-footer">
+    <div class="log-header">
+      <span>DIAGNOSTIC EVENT CONSOLE</span>
+      <span class="fps-tag" id="fps-counter">FPS: 60.0</span>
+    </div>
+    <div class="log-content" id="log-console">
+      <div class="log-entry">[00:00:00] 3D Obstacle Sensor & Emergency Braking System Active.</div>
+    </div>
+  </footer>
+
+  <script src="app.js?v=3"></script>
+</body>
+</html>
