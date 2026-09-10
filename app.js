@@ -8,20 +8,63 @@
 // Global Configuration & Knowledge Base
 // ---------------------------------------------------------
 const TOPICS = {
-  "Admissions": "Welcome to Admissions Center. Eligibility includes 60% aggregate in Math and Science.",
+  "Admissions": "Welcome to Admissions Center at RBMI Group of Institutions. Eligibility includes 60% aggregate in Math and Science.",
+  "Student Cell": "Welcome to the Student Cell at RBMI Group of Institutions. We assist students with scholarships, academic counseling, grievance redressal, placement training, and student club activities.",
   "Departments": "Engineering Hub offers Computer Science, AI, Robotics, Mechanical, and Electrical Engineering.",
   "Student Projects": "Students build autonomous electric vehicles, 3D hologram displays, and AI vision systems.",
-  "Campus Tour": "Our 50-acre campus features smart classrooms, high-performance computing labs, and sports complexes.",
+  "Campus Tour": "Our expansive campus features smart classrooms, high-performance computing labs, student welfare centers, and sports complexes.",
   "AI & Robotics": "The AI & Robotics Center features GPU clusters, ROS manipulators, and OpenCV mobile prototyping kits.",
-  "Contact Us": "Reach reception at reception@dsacollege.edu or call +91-98765-43210."
+  "Contact Us": "Reach reception at reception@rbmi.in or call +91-98765-43210."
 };
 
 const VOICE_KEYWORDS = {
-  "admission": "Admissions", "apply": "Admissions",
-  "department": "Departments", "course": "Departments",
-  "project": "Student Projects", "tour": "Campus Tour",
-  "ai": "AI & Robotics", "robot": "AI & Robotics",
+  "admission": "Admissions", "admissions": "Admissions", "apply": "Admissions",
+  "take admission": "Admissions", "want admission": "Admissions",
+  "admission hub": "Admissions", "admissions hub": "Admissions", "admission center": "Admissions",
+  "student cell": "Student Cell", "student": "Student Cell", "welfare": "Student Cell",
+  "scholarship": "Student Cell", "cell": "Student Cell", "student support": "Student Cell",
+  "department": "Departments", "course": "Departments", "engineering": "Departments",
+  "project": "Student Projects", "tour": "Campus Tour", "campus": "Campus Tour",
+  "ai": "AI & Robotics", "robot": "AI & Robotics", "robotics": "AI & Robotics",
   "contact": "Contact Us", "phone": "Contact Us"
+};
+
+// ---------------------------------------------------------
+// Campus Navigation Destinations (45m quadrant positions)
+// ---------------------------------------------------------
+const CAMPUS_DESTINATIONS = {
+  "Admissions": {
+    name: "Admissions Center",
+    x: 35.0,
+    z: 35.0,
+    targetHeading: Math.PI / 4,
+    topic: "Admissions",
+    arrivalMsg: "We have arrived at the Admissions Center! Welcome to RBMI Group of Institutions. Admissions are open for engineering, management, and technology programs. Eligibility includes 60% aggregate in Math and Science. Please proceed inside for counseling and registration."
+  },
+  "Student Cell": {
+    name: "Student Cell",
+    x: 35.0,
+    z: -35.0,
+    targetHeading: Math.PI * 0.75,
+    topic: "Student Cell",
+    arrivalMsg: "We have arrived at the Student Cell! Welcome to the Student Welfare and Support Center at RBMI Group of Institutions. We assist with scholarships, academic counseling, grievance redressal, and extracurricular student clubs. Please step inside for student services."
+  },
+  "Departments": {
+    name: "Engineering Hub",
+    x: -35.0,
+    z: 35.0,
+    targetHeading: -Math.PI / 4,
+    topic: "Departments",
+    arrivalMsg: "We have arrived at the Engineering Hub! We offer Computer Science, AI, Robotics, Mechanical, and Electrical Engineering."
+  },
+  "AI & Robotics": {
+    name: "AI & Robotics Hub",
+    x: -35.0,
+    z: -35.0,
+    targetHeading: -Math.PI * 0.75,
+    topic: "AI & Robotics",
+    arrivalMsg: "We have arrived at the AI & Robotics Hub! Here you will find GPU clusters, ROS manipulators, and OpenCV autonomous prototyping kits."
+  }
 };
 
 // ---------------------------------------------------------
@@ -42,7 +85,7 @@ let obstacles = [];
 let carSpeed = 0.0;
 let carHeading = 0.0;
 let steeringAngle = 0.0;
-const MAX_SPEED = 0.6;
+const MAX_SPEED = 0.65;
 const MAX_REVERSE_SPEED = -0.25;
 const ACCEL = 0.015;
 const FRICTION = 0.008;
@@ -55,11 +98,32 @@ let nearestObstacleDistance = 999.0;
 let lastObstacleWarningTime = 0;
 const EMERGENCY_STOP_DIST = 3.8; // Meters
 
-let driveMode = "manual"; // "manual", "autopilot"
+let driveMode = "manual"; // "manual", "autopilot", "navigate"
 let cameraMode = "chase"; // "chase", "orbit"
 let selectedObject = "Autonomous_Car";
 let isTtsMuted = false;
 let isDisplayActive = true;
+
+// Dedicated Navigation Target State
+let targetDestination = null; // { name, x, z, topic, targetHeading, arrivalMsg }
+let admissionBeacon = null;
+let admissionEntranceMarker = null;
+let studentCellBeacon = null;
+let studentCellEntranceMarker = null;
+let engineeringBeacon = null;
+let engineeringEntranceMarker = null;
+let aiRoboticsBeacon = null;
+let aiRoboticsEntranceMarker = null;
+let buildingMeshes = {};
+let buildingLabels = {};
+
+// Campus Building Directory for Real-Time Distance Monitoring (90m inter-building separation)
+const CAMPUS_BUILDING_SPECS = [
+  { name: "Admissions Center", topicKey: "Admissions", x: 45, z: 45, color: "#00e6ff", elId: "dist-val-admissions" },
+  { name: "Student Cell", topicKey: "Student Cell", x: 45, z: -45, color: "#aa44ff", elId: "dist-val-studentcell" },
+  { name: "Engineering Hub", topicKey: "Departments", x: -45, z: 45, color: "#00ff88", elId: "dist-val-engineering" },
+  { name: "AI & Robotics Hub", topicKey: "AI & Robotics", x: -45, z: -45, color: "#ffaa00", elId: "dist-val-airobotics" },
+];
 
 // Visitor Simulation State
 let activeVisitor = null;         // The 3D visitor group currently walking
@@ -70,12 +134,13 @@ let visitorBobTime = 0;           // Walking bob animation counter
 
 const keys = {};
 
-// Autopilot Waypoints
+// Autopilot Waypoints (Expanded 90m campus perimeter tour)
 const waypoints = [
   { x: 0, z: 0, topic: "Campus Tour" },
-  { x: 15, z: 15, topic: "Admissions" },
-  { x: 0, z: -20, topic: "AI & Robotics" },
-  { x: -18, z: 10, topic: "Departments" },
+  { x: 35.0, z: 35.0, topic: "Admissions" },
+  { x: 35.0, z: -35.0, topic: "Student Cell" },
+  { x: -35.0, z: -35.0, topic: "AI & Robotics" },
+  { x: -35.0, z: 35.0, topic: "Departments" },
 ];
 let currentWaypointIdx = 0;
 let lastProximityTime = 0;
@@ -116,9 +181,9 @@ function init3DViewport() {
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x080c14);
-  scene.fog = new THREE.FogExp2(0x080c14, 0.025);
+  scene.fog = new THREE.FogExp2(0x080c14, 0.007);
 
-  camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 150);
+  camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 350);
   camera.position.set(0, 4, 8);
 
   renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
@@ -131,12 +196,19 @@ function init3DViewport() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
   scene.add(ambientLight);
 
   const dirLight = new THREE.DirectionalLight(0x00e6ff, 1.2);
-  dirLight.position.set(12, 18, 12);
+  dirLight.position.set(30, 45, 30);
   dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.left = -90;
+  dirLight.shadow.camera.right = 90;
+  dirLight.shadow.camera.top = 90;
+  dirLight.shadow.camera.bottom = -90;
+  dirLight.shadow.camera.far = 220;
   scene.add(dirLight);
 
   buildCampusEnvironment();
@@ -146,41 +218,354 @@ function init3DViewport() {
   build3DObstacles();
   buildForwardLaserSensor();
 
-  addLog("Three.js 3D Obstacle Detection & AEB Engine loaded.");
+  addLog("Extended Campus Map (240m) & Student Cell initialized.");
 
   window.addEventListener("resize", onWindowResize);
 }
 
 // ---------------------------------------------------------
-// Build Campus Buildings & 3D Roadways
+// Build Campus Buildings & Dynamic 3D Distance Labels
+// ---------------------------------------------------------
+function createFloatingLabel(title, colorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 160;
+  const ctx = canvas.getContext("2d");
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(8.5, 2.65, 1);
+
+  sprite.userData = {
+    canvas,
+    ctx,
+    texture,
+    title,
+    colorHex: colorHex || "#00e6ff",
+    lastDist: -1
+  };
+
+  renderLabelCanvas(sprite, 0);
+  return sprite;
+}
+
+function renderLabelCanvas(sprite, distMeters) {
+  const data = sprite.userData;
+  if (!data) return;
+  const rounded = Math.round(distMeters);
+  if (data.lastDist === rounded) return;
+  data.lastDist = rounded;
+
+  const { canvas, ctx, texture, title, colorHex } = data;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Rounded pill background with glassmorphism accent
+  ctx.fillStyle = "rgba(10, 18, 32, 0.90)";
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 22);
+  } else {
+    ctx.rect(8, 8, canvas.width - 16, canvas.height - 16);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Title text
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 32px 'Segoe UI', Roboto, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(title, canvas.width / 2, 50);
+
+  // Live Distance text badge
+  ctx.fillStyle = colorHex;
+  ctx.font = "bold 26px 'JetBrains Mono', Consolas, monospace";
+  ctx.fillText(`📍 ${rounded}m AWAY`, canvas.width / 2, 110);
+
+  texture.needsUpdate = true;
+}
+
+function updateCampusDistances() {
+  if (!carGroup) return;
+
+  CAMPUS_BUILDING_SPECS.forEach((b) => {
+    const dist = Math.hypot(carGroup.position.x - b.x, carGroup.position.z - b.z);
+    // Update 3D floating sprite label
+    const sprite = buildingLabels[b.name];
+    if (sprite) {
+      renderLabelCanvas(sprite, dist);
+    }
+    // Update Sidebar UI distance badge
+    const el = document.getElementById(b.elId);
+    if (el) {
+      el.innerText = `${Math.round(dist)} m`;
+    }
+  });
+}
+
+function createWayfindingSign(text, colorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 400;
+  canvas.height = 70;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "rgba(10, 20, 36, 0.92)";
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(4, 4, 392, 62, 12);
+  else ctx.rect(4, 4, 392, 62);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = colorHex;
+  ctx.font = "bold 24px 'JetBrains Mono', Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 200, 35);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(2.8, 0.49, 1);
+  return sprite;
+}
+
+// ---------------------------------------------------------
+// Build Campus Buildings, Extended Map & 3D Roadways
 // ---------------------------------------------------------
 function buildCampusEnvironment() {
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x121a24, roughness: 0.8 });
-  const groundGeo = new THREE.PlaneGeometry(100, 100);
-  const groundMesh = new THREE.Mesh(groundGeo, roadMat);
+  const terrainMat = new THREE.MeshStandardMaterial({ color: 0x0c121d, roughness: 0.9 });
+  const groundGeo = new THREE.PlaneGeometry(240, 240);
+  const groundMesh = new THREE.Mesh(groundGeo, terrainMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
-  const gridHelper = new THREE.GridHelper(100, 50, 0x00e6ff, 0x1f2e42);
-  gridHelper.position.y = 0.01;
+  // Extended cyber grid
+  const gridHelper = new THREE.GridHelper(240, 60, 0x00e6ff, 0x162232);
+  gridHelper.position.y = 0.005;
   scene.add(gridHelper);
 
+  // Paved Main Road Material
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x141c29, roughness: 0.8 });
+
+  // Main North-South Boulevard (Z-axis, 230m long)
+  const nsRoadGeo = new THREE.PlaneGeometry(10, 230);
+  const nsRoad = new THREE.Mesh(nsRoadGeo, roadMat);
+  nsRoad.rotation.x = -Math.PI / 2;
+  nsRoad.position.set(0, 0.012, 0);
+  nsRoad.receiveShadow = true;
+  scene.add(nsRoad);
+
+  // Main East-West Boulevard (X-axis, 230m long)
+  const ewRoadGeo = new THREE.PlaneGeometry(230, 10);
+  const ewRoad = new THREE.Mesh(ewRoadGeo, roadMat);
+  ewRoad.rotation.x = -Math.PI / 2;
+  ewRoad.position.set(0, 0.012, 0);
+  ewRoad.receiveShadow = true;
+  scene.add(ewRoad);
+
+  // Central Campus Roundabout Plaza at (0, 0)
+  const plazaGeo = new THREE.CylinderGeometry(14, 14, 0.02, 36);
+  const plazaMesh = new THREE.Mesh(plazaGeo, roadMat);
+  plazaMesh.position.set(0, 0.015, 0);
+  scene.add(plazaMesh);
+
+  // Central Cyan Cyber Fountain Ring
+  const centerRingGeo = new THREE.TorusGeometry(3.8, 0.14, 16, 32);
+  const centerRingMat = new THREE.MeshBasicMaterial({ color: 0x00e6ff });
+  const centerRing = new THREE.Mesh(centerRingGeo, centerRingMat);
+  centerRing.rotation.x = Math.PI / 2;
+  centerRing.position.set(0, 0.06, 0);
+  scene.add(centerRing);
+
+  // Diagonal Branch Avenues connecting Roundabout to the 4 Distanced Hubs
+  const makeBranch = (x, z, w, l, rot) => {
+    const bGeo = new THREE.PlaneGeometry(w, l);
+    const bMesh = new THREE.Mesh(bGeo, roadMat);
+    bMesh.rotation.x = -Math.PI / 2;
+    bMesh.rotation.z = rot || 0;
+    bMesh.position.set(x, 0.014, z);
+    bMesh.receiveShadow = true;
+    scene.add(bMesh);
+  };
+  makeBranch(20, 20, 8, 44, Math.PI / 4);     // Avenue to Admissions Center (64m out)
+  makeBranch(20, -20, 8, 44, -Math.PI / 4);  // Avenue to Student Cell (64m out)
+  makeBranch(-20, 20, 8, 44, -Math.PI / 4);  // Avenue to Engineering Hub (64m out)
+  makeBranch(-20, -20, 8, 44, Math.PI / 4);  // Avenue to AI & Robotics (64m out)
+
+  // Outer Campus Perimeter Ring Roads (Exact 90m direct inter-building connections)
+  const makeRingRoad = (x, z, w, l) => {
+    const rGeo = new THREE.PlaneGeometry(w, l);
+    const rMesh = new THREE.Mesh(rGeo, roadMat);
+    rMesh.rotation.x = -Math.PI / 2;
+    rMesh.position.set(x, 0.013, z);
+    rMesh.receiveShadow = true;
+    scene.add(rMesh);
+  };
+  makeRingRoad(0, 45, 90, 8);   // North Avenue (Engineering <-> Admissions: 90m)
+  makeRingRoad(0, -45, 90, 8);  // South Avenue (AI Robotics <-> Student Cell: 90m)
+  makeRingRoad(45, 0, 8, 90);   // East Avenue (Student Cell <-> Admissions: 90m)
+  makeRingRoad(-45, 0, 8, 90);  // West Avenue (AI Robotics <-> Engineering: 90m)
+
+  // ---------------------------------------------------------
+  // Central Roundabout Wayfinding Totem (Distance Directory)
+  // ---------------------------------------------------------
+  const totemGroup = new THREE.Group();
+  totemGroup.name = "Wayfinding_Directory_Totem";
+
+  const poleGeo = new THREE.CylinderGeometry(0.35, 0.45, 5.0, 16);
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x1a2638, metalness: 0.8, roughness: 0.2 });
+  const pole = new THREE.Mesh(poleGeo, poleMat);
+  pole.position.y = 2.5;
+  totemGroup.add(pole);
+
+  [-0.8, 0.2, 1.2].forEach((offsetY) => {
+    const rGeo = new THREE.TorusGeometry(0.48, 0.05, 12, 24);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0x00e6ff });
+    const rMesh = new THREE.Mesh(rGeo, rMat);
+    rMesh.rotation.x = Math.PI / 2;
+    rMesh.position.y = 2.5 + offsetY;
+    totemGroup.add(rMesh);
+  });
+
+  const signs = [
+    { text: "↗ ADMISSIONS • 64m", color: "#00e6ff", rotY: -Math.PI / 4, posY: 4.2 },
+    { text: "↘ STUDENT CELL • 64m", color: "#aa44ff", rotY: -Math.PI * 0.75, posY: 3.7 },
+    { text: "↖ ENGINEERING • 64m", color: "#00ff88", rotY: Math.PI / 4, posY: 3.2 },
+    { text: "↙ AI & ROBOTICS • 64m", color: "#ffaa00", rotY: Math.PI * 0.75, posY: 2.7 }
+  ];
+
+  signs.forEach((s) => {
+    const armGeo = new THREE.BoxGeometry(2.4, 0.35, 0.08);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x111c2a });
+    const arm = new THREE.Mesh(armGeo, armMat);
+    arm.position.set(1.2, s.posY, 0);
+
+    const signLabel = createWayfindingSign(s.text, s.color);
+    signLabel.position.set(1.2, s.posY + 0.02, 0.06);
+
+    const signArmGroup = new THREE.Group();
+    signArmGroup.rotation.y = s.rotY;
+    signArmGroup.add(arm);
+    signArmGroup.add(signLabel);
+    totemGroup.add(signArmGroup);
+  });
+  scene.add(totemGroup);
+
+  // ---------------------------------------------------------
+  // Campus Buildings (45m Quadrants: 90m Spacing)
+  // ---------------------------------------------------------
   const buildings = [
-    { name: "Admissions Center", pos: [15, 0, 15], color: 0x00aaff, size: [6, 4, 6] },
-    { name: "Engineering Hub", pos: [-18, 0, 10], color: 0x00ff88, size: [7, 5, 8] },
-    { name: "AI & Robotics Hub", pos: [0, 0, -20], color: 0xffaa00, size: [8, 6, 7] },
+    { name: "Admissions Center", label: "🎓 Admissions Center", pos: [45, 0, 45], color: 0x00aaff, size: [10, 7, 10] },
+    { name: "Student Cell", label: "📋 Student Cell", pos: [45, 0, -45], color: 0xaa44ff, size: [10, 7, 10] },
+    { name: "Engineering Hub", label: "🏫 Engineering Hub", pos: [-45, 0, 45], color: 0x00ff88, size: [11, 7, 11] },
+    { name: "AI & Robotics Hub", label: "🤖 AI & Robotics Hub", pos: [-45, 0, -45], color: 0xffaa00, size: [11, 7, 11] },
   ];
 
   buildings.forEach((b) => {
     const bGeo = new THREE.BoxGeometry(...b.size);
     const bMat = new THREE.MeshStandardMaterial({ color: b.color, metalness: 0.5, roughness: 0.3 });
     const bMesh = new THREE.Mesh(bGeo, bMat);
+    bMesh.name = b.name;
     bMesh.position.set(b.pos[0], b.size[1] / 2, b.pos[2]);
     bMesh.castShadow = true;
     bMesh.receiveShadow = true;
     scene.add(bMesh);
+    buildingMeshes[b.name] = bMesh;
+
+    // Dynamic 3D floating text label sprite with live distance
+    const labelSprite = createFloatingLabel(b.label, "#" + b.color.toString(16).padStart(6, "0"));
+    labelSprite.position.set(b.pos[0], b.size[1] + 3.2, b.pos[2]);
+    scene.add(labelSprite);
+    buildingLabels[b.name] = labelSprite;
   });
+
+  // Helper to create entrance parking pad and beacon
+  const createEntranceStation = (x, z, colorHex, name) => {
+    const padGeo = new THREE.CylinderGeometry(2.8, 2.8, 0.05, 32);
+    const padMat = new THREE.MeshStandardMaterial({
+      color: 0x0a2238,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: colorHex,
+      emissiveIntensity: 0.3
+    });
+    const pad = new THREE.Mesh(padGeo, padMat);
+    pad.position.set(x, 0.025, z);
+    scene.add(pad);
+
+    const ringGeo = new THREE.RingGeometry(2.7, 3.1, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.035, z);
+    scene.add(ring);
+
+    const beaconGeo = new THREE.CylinderGeometry(0.8, 2.0, 24, 24, 1, true);
+    const beaconMat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    });
+    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+    beacon.name = `${name}_Beacon`;
+    beacon.position.set(x, 12, z);
+    beacon.visible = false;
+    scene.add(beacon);
+
+    return { pad, beacon };
+  };
+
+  // Entrance Stations (Admissions, Student Cell, Engineering, AI & Robotics)
+  const admStation = createEntranceStation(35.0, 35.0, 0x00e6ff, "Admissions");
+  admissionEntranceMarker = admStation.pad;
+  admissionBeacon = admStation.beacon;
+
+  const scStation = createEntranceStation(35.0, -35.0, 0xaa44ff, "Student_Cell");
+  studentCellEntranceMarker = scStation.pad;
+  studentCellBeacon = scStation.beacon;
+
+  const engStation = createEntranceStation(-35.0, 35.0, 0x00ff88, "Engineering");
+  engineeringEntranceMarker = engStation.pad;
+  engineeringBeacon = engStation.beacon;
+
+  const aiStation = createEntranceStation(-35.0, -35.0, 0xffaa00, "AI_Robotics");
+  aiRoboticsEntranceMarker = aiStation.pad;
+  aiRoboticsBeacon = aiStation.beacon;
+
+  // Outer Campus Perimeter Light Posts along +/- 115
+  const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 3.5, 12);
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x223344, metalness: 0.8 });
+  const tipGeo = new THREE.SphereGeometry(0.25, 12, 12);
+  const tipMat = new THREE.MeshBasicMaterial({ color: 0x00e6ff });
+
+  for (let p = -110; p <= 110; p += 40) {
+    [-115, 115].forEach((borderX) => {
+      const pMesh = new THREE.Mesh(postGeo, postMat);
+      pMesh.position.set(borderX, 1.75, p);
+      const tMesh = new THREE.Mesh(tipGeo, tipMat);
+      tMesh.position.set(borderX, 3.5, p);
+      scene.add(pMesh);
+      scene.add(tMesh);
+    });
+    [-115, 115].forEach((borderZ) => {
+      const pMesh = new THREE.Mesh(postGeo, postMat);
+      pMesh.position.set(p, 1.75, borderZ);
+      const tMesh = new THREE.Mesh(tipGeo, tipMat);
+      tMesh.position.set(p, 3.5, borderZ);
+      scene.add(pMesh);
+      scene.add(tMesh);
+    });
+  }
 }
 
 // ---------------------------------------------------------
@@ -274,12 +659,12 @@ function buildForwardLaserSensor() {
 // Build 3D Campus Roadway Obstacles
 // ---------------------------------------------------------
 function build3DObstacles() {
-  // Traffic Cone 1
-  spawnTrafficCone(6.0, 6.0);
+  // Traffic Cone 1 (placed on roadside for sensor testing)
+  spawnTrafficCone(5.0, 3.0);
   // Construction Barrier
   spawnBarrier(-10.0, 5.0);
-  // Pedestrian Character
-  spawnPedestrian(0.0, -10.0);
+  // Pedestrian Character (roadside sidewalk)
+  spawnPedestrian(6.0, -10.0);
 }
 
 function spawnTrafficCone(x, z) {
@@ -552,6 +937,81 @@ function updateVehiclePhysics() {
         carSpeed = Math.min(0.35, dist * 0.08);
       }
     }
+  } else if (driveMode === "navigate") {
+    if (isObstacleDetected) {
+      carSpeed = 0; // AEB safety stop during navigation
+      updateNavStatusUI(`⚠️ Stopped: Obstacle ahead on route to ${targetDestination ? targetDestination.name : "destination"}`);
+    } else if (targetDestination) {
+      const dx = targetDestination.x - carGroup.position.x;
+      const dz = targetDestination.z - carGroup.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      updateNavStatusUI(`🚗 Moving to ${targetDestination.name} (${dist.toFixed(1)}m remaining)`);
+
+      if (dist < 2.2) {
+        // Arrived at destination! Guaranteed complete stop
+        carSpeed = 0;
+        steeringAngle = 0;
+        carGroup.position.x = targetDestination.x;
+        carGroup.position.z = targetDestination.z;
+
+        if (targetDestination.targetHeading !== undefined) {
+          carHeading = targetDestination.targetHeading;
+          carGroup.rotation.y = carHeading;
+        }
+
+        const destInfo = targetDestination;
+        driveMode = "manual";
+        targetDestination = null;
+
+        if (admissionBeacon) admissionBeacon.visible = false;
+        if (studentCellBeacon) studentCellBeacon.visible = false;
+        hideNavStatusUI();
+
+        const arrivalSpeech = destInfo.arrivalMsg || `Arrived at ${destInfo.name}. ${TOPICS[destInfo.topic] || ""}`;
+        speakText(arrivalSpeech);
+        addLog(`📍 Arrived at ${destInfo.name}! Navigation completed.`);
+
+        const speechBox = document.getElementById("speech-response-text");
+        if (speechBox) speechBox.innerText = arrivalSpeech;
+
+        triggerArrivalEffect(destInfo.name);
+
+        document.getElementById("mode-manual")?.classList.add("active");
+        document.getElementById("mode-autopilot")?.classList.remove("active");
+      } else {
+        const targetAngle = Math.atan2(dx, dz);
+        let angleDiff = targetAngle - carHeading;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+        steeringAngle = Math.max(-MAX_STEER, Math.min(MAX_STEER, angleDiff * 2.2));
+
+        // Smooth direct heading alignment toward target
+        const turnSpeed = Math.min(Math.abs(angleDiff), 0.08);
+        carHeading += Math.sign(angleDiff) * turnSpeed;
+
+        // Speed control: high-speed long-distance cruise & arrival easing
+        let cruiseSpeed = 0.50;
+        if (dist <= 25 && dist > 10) {
+          cruiseSpeed = 0.35;
+        }
+        if (Math.abs(angleDiff) > 0.5) {
+          cruiseSpeed = 0.16;
+        }
+        if (dist <= 10.0) {
+          cruiseSpeed = Math.min(cruiseSpeed, Math.max(0.06, dist * 0.045));
+        }
+
+        if (carSpeed < cruiseSpeed) {
+          carSpeed = Math.min(cruiseSpeed, carSpeed + ACCEL);
+        } else if (carSpeed > cruiseSpeed) {
+          carSpeed = Math.max(cruiseSpeed, carSpeed - FRICTION * 3);
+        }
+      }
+    } else {
+      driveMode = "manual";
+    }
   }
 
   if (frontWheelL && frontWheelR) {
@@ -559,8 +1019,8 @@ function updateVehiclePhysics() {
     frontWheelR.rotation.y = steeringAngle;
   }
 
-  // Responsive heading turning with low-speed assist and correct reverse turning
-  if (Math.abs(carSpeed) > 0.005) {
+  // Only apply manual steering yaw when in manual drive mode
+  if (driveMode === "manual" && Math.abs(carSpeed) > 0.005) {
     const steerFactor = Math.max(0.35, Math.abs(carSpeed) / MAX_SPEED);
     const dirSign = carSpeed >= 0 ? 1 : -1;
     carHeading += steeringAngle * steerFactor * 0.055 * dirSign;
@@ -614,20 +1074,23 @@ function updateVehiclePhysics() {
 }
 
 function checkLandmarkProximity() {
+  if (driveMode === "navigate") return; // Never interrupt active navigation!
+
   const now = performance.now();
   if (now - lastProximityTime < 8000) return;
 
   const landmarks = [
-    { name: "Admissions Center", pos: [15, 15], topic: "Admissions" },
-    { name: "Engineering Hub", pos: [-18, 10], topic: "Departments" },
-    { name: "AI & Robotics Hub", pos: [0, -20], topic: "AI & Robotics" },
+    { name: "Admissions Center", pos: [45, 45], topic: "Admissions" },
+    { name: "Student Cell", pos: [45, -45], topic: "Student Cell" },
+    { name: "Engineering Hub", pos: [-45, 45], topic: "Departments" },
+    { name: "AI & Robotics Hub", pos: [-45, -45], topic: "AI & Robotics" },
   ];
 
   landmarks.forEach((lm) => {
     const dist = Math.hypot(carGroup.position.x - lm.pos[0], carGroup.position.z - lm.pos[1]);
-    if (dist < 8.0) {
+    if (dist < 14.0) {
       lastProximityTime = now;
-      addLog(`Proximity Detected: Approaching ${lm.name}`);
+      addLog(`Proximity Detected: Approaching ${lm.name} (${Math.round(dist)}m)`);
       speakText(`Approaching ${lm.name}. ${TOPICS[lm.topic]}`);
     }
   });
@@ -673,26 +1136,266 @@ function initWebCam() {
   processVisionFrame();
 }
 
-function speakText(text) {
-  if (isTtsMuted) return;
+function speakText(text, onEndCallback) {
+  const responseEl = document.getElementById("speech-response-text");
+  if (responseEl) responseEl.innerText = text;
+
+  if (isTtsMuted) {
+    if (typeof onEndCallback === "function") {
+      setTimeout(onEndCallback, 250);
+    }
+    return;
+  }
 
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
-    window.speechSynthesis.speak(utterance);
-  }
 
-  const responseEl = document.getElementById("speech-response-text");
-  if (responseEl) responseEl.innerText = text;
+    let callbackCalled = false;
+    const finish = () => {
+      if (!callbackCalled && typeof onEndCallback === "function") {
+        callbackCalled = true;
+        onEndCallback();
+      }
+    };
+
+    utterance.onend = finish;
+    utterance.onerror = finish;
+
+    // Safety fallback timer in case speech synthesis event is delayed
+    if (typeof onEndCallback === "function") {
+      const approxDuration = Math.max(1200, (text.split(" ").length / 2.5) * 1000 + 400);
+      setTimeout(finish, approxDuration);
+    }
+
+    window.speechSynthesis.speak(utterance);
+  } else {
+    if (typeof onEndCallback === "function") {
+      setTimeout(onEndCallback, 400);
+    }
+  }
 }
 
-function listenMicrophone() {
+// ---------------------------------------------------------
+// Autonomous Campus Navigation System
+// ---------------------------------------------------------
+
+function navigateToDestination(destKey) {
+  const dest = typeof destKey === "string" ? CAMPUS_DESTINATIONS[destKey] : destKey;
+  if (!dest) {
+    addLog(`Unknown destination: ${destKey}`);
+    return;
+  }
+
+  targetDestination = dest;
+  driveMode = "navigate";
+
+  // Light up the beacon corresponding to the destination
+  if (admissionBeacon) admissionBeacon.visible = (dest.topic === "Admissions");
+  if (studentCellBeacon) studentCellBeacon.visible = (dest.topic === "Student Cell");
+  if (engineeringBeacon) engineeringBeacon.visible = (dest.topic === "Departments");
+  if (aiRoboticsBeacon) aiRoboticsBeacon.visible = (dest.topic === "AI & Robotics");
+
+  // Update UI driving mode buttons
+  document.getElementById("mode-manual")?.classList.remove("active");
+  document.getElementById("mode-autopilot")?.classList.remove("active");
+
+  const dist = Math.hypot(dest.x - carGroup.position.x, dest.z - carGroup.position.z);
+  const startMsg = `Navigating to ${dest.name}. Distance is ${Math.round(dist)} meters. Please follow me.`;
+  speakText(startMsg);
+  addLog(`🧭 Autonomous Navigation Initiated: Moving to '${dest.name}' at (${dest.x}, ${dest.z}), Distance: ${Math.round(dist)}m`);
+
+  const speechBox = document.getElementById("speech-response-text");
+  if (speechBox) speechBox.innerText = `Vehicle: "Navigating to ${dest.name} (${Math.round(dist)}m)..."`;
+
+  showNavStatusUI(dest.name);
+}
+
+function cancelNavigation() {
+  if (driveMode === "navigate" || targetDestination) {
+    driveMode = "manual";
+    targetDestination = null;
+    if (admissionBeacon) admissionBeacon.visible = false;
+    if (studentCellBeacon) studentCellBeacon.visible = false;
+    if (engineeringBeacon) engineeringBeacon.visible = false;
+    if (aiRoboticsBeacon) aiRoboticsBeacon.visible = false;
+    hideNavStatusUI();
+    carSpeed = 0;
+    steeringAngle = 0;
+    addLog("Navigation canceled by user. Manual drive restored.");
+    speakText("Navigation canceled. Returning to manual control.");
+    document.getElementById("mode-manual")?.classList.add("active");
+  }
+}
+
+function showNavStatusUI(destinationName) {
+  const badge = document.getElementById("nav-status-badge");
+  const textEl = document.getElementById("nav-status-text");
+  if (badge && textEl) {
+    badge.style.display = "flex";
+    textEl.innerText = `🚗 Navigating to ${destinationName}...`;
+  }
+}
+
+function updateNavStatusUI(text) {
+  const textEl = document.getElementById("nav-status-text");
+  if (textEl) textEl.innerText = text;
+}
+
+function hideNavStatusUI() {
+  const badge = document.getElementById("nav-status-badge");
+  if (badge) badge.style.display = "none";
+}
+
+function triggerArrivalEffect(buildingName) {
+  const mesh = buildingMeshes[buildingName];
+  if (mesh && mesh.material) {
+    mesh.material.emissive.setHex(0x00ffff);
+    let flashCount = 0;
+    const interval = setInterval(() => {
+      flashCount++;
+      if (flashCount % 2 === 1) {
+        mesh.material.emissive.setHex(0x0088cc);
+      } else {
+        mesh.material.emissive.setHex(0x00ffff);
+      }
+      if (flashCount > 6) {
+        clearInterval(interval);
+        mesh.material.emissive.setHex(0x000000);
+      }
+    }, 350);
+  }
+}
+
+function processVoiceCommand(rawTranscript) {
+  if (!rawTranscript || typeof rawTranscript !== "string") return;
+  const transcript = rawTranscript.toLowerCase().trim();
+  addLog(`Processing Voice Command: '${rawTranscript}'`);
+
+  const speechBox = document.getElementById("speech-response-text");
+  if (speechBox) speechBox.innerText = `Heard: "${rawTranscript}"`;
+
+  // 0. Check for DISTANCE query:
+  if (
+    transcript.includes("distance") ||
+    transcript.includes("how far") ||
+    transcript.includes("between buildings") ||
+    transcript.includes("building distance")
+  ) {
+    const distAdm = Math.round(Math.hypot(carGroup.position.x - 45, carGroup.position.z - 45));
+    const distCell = Math.round(Math.hypot(carGroup.position.x - 45, carGroup.position.z - (-45)));
+    const distEng = Math.round(Math.hypot(carGroup.position.x - (-45), carGroup.position.z - 45));
+    const distAI = Math.round(Math.hypot(carGroup.position.x - (-45), carGroup.position.z - (-45)));
+
+    const distSpeech = `The campus buildings are 90 meters apart from each other. From your current vehicle position: Admissions Center is ${distAdm} meters, Student Cell is ${distCell} meters, Engineering Hub is ${distEng} meters, and AI Robotics Hub is ${distAI} meters away.`;
+    speakText(distSpeech);
+    addLog(`📏 Spoke Campus Distances: Adm=${distAdm}m, Cell=${distCell}m, Eng=${distEng}m, AI=${distAI}m`);
+    return;
+  }
+
+  // 1. Check for ADMISSION navigation intent:
+  // Triggered when user says "i want to take admission", "take admission", "admission center", "admission hub", etc.
+  const isAdmissionNav = (
+    transcript.includes("take admission") ||
+    transcript.includes("want to take admission") ||
+    transcript.includes("want admission") ||
+    transcript.includes("get admission") ||
+    transcript.includes("apply for admission") ||
+    transcript.includes("go to admission") ||
+    transcript.includes("move to admission") ||
+    transcript.includes("take me to admission") ||
+    transcript.includes("admission center") ||
+    transcript.includes("admission hub") ||
+    transcript.includes("admissions hub") ||
+    transcript.includes("admission cell") ||
+    transcript.includes("where is admission") ||
+    transcript.includes("admission") ||
+    transcript.includes("admissions") ||
+    transcript.includes("apply")
+  );
+
+  // 1b. Check for STUDENT CELL navigation intent:
+  const isStudentCellNav = (
+    transcript.includes("student cell") ||
+    transcript.includes("students cell") ||
+    transcript.includes("student hub") ||
+    transcript.includes("students hub") ||
+    transcript.includes("go to student") ||
+    transcript.includes("move to student") ||
+    transcript.includes("take me to student") ||
+    transcript.includes("student welfare") ||
+    transcript.includes("scholarship cell") ||
+    transcript.includes("scholarships cell") ||
+    transcript.includes("scholarship") ||
+    transcript.includes("scholarships")
+  );
+
+  // If a visitor is at the window, complete the interaction and have them depart
+  if (activeVisitor && visitorPhase === "arrived") {
+    visitorPhase = "departing";
+    updateVisitorStatusBadge("Visitor satisfied — departing...");
+    addLog("Visitor inquiry answered via voice. Visitor departing.");
+    setTimeout(() => removeVisitor(), 3500);
+  }
+
+  if (isAdmissionNav) {
+    addLog("🎙️ Voice Command Matched: 'Take Admission / Admission Hub' -> Moving car to Admissions Center!");
+    navigateToDestination("Admissions");
+    return;
+  }
+
+  if (isStudentCellNav) {
+    addLog("🎙️ Voice Command Matched: 'Student Cell' -> Moving car to Student Cell!");
+    navigateToDestination("Student Cell");
+    return;
+  }
+
+  // 2. Check for other departments or AI & Robotics navigation
+  if (transcript.includes("department") || transcript.includes("engineering") || transcript.includes("course")) {
+    navigateToDestination("Departments");
+    return;
+  }
+  if (transcript.includes("robot") || transcript.includes("ai") || transcript.includes("robotics")) {
+    navigateToDestination("AI & Robotics");
+    return;
+  }
+
+  // 3. Check for campus tour
+  if (transcript.includes("tour") || transcript.includes("campus tour")) {
+    driveMode = "autopilot";
+    document.getElementById("mode-autopilot")?.classList.add("active");
+    document.getElementById("mode-manual")?.classList.remove("active");
+    speakText("Autopilot Tour mode activated. Navigating campus landmarks.");
+    addLog("Autopilot Tour mode activated via voice command.");
+    return;
+  }
+
+  // 4. Fallback topic search
+  let matchedTopic = null;
+  for (const [key, topic] of Object.entries(VOICE_KEYWORDS)) {
+    if (transcript.includes(key)) {
+      matchedTopic = topic;
+      break;
+    }
+  }
+
+  if (matchedTopic) {
+    addLog(`Matched Topic: ${matchedTopic}`);
+    speakText(`You asked about ${matchedTopic}. ${TOPICS[matchedTopic]}`);
+  } else {
+    speakText(`I heard: ${rawTranscript}. Say 'I want to take admission' to drive to Admissions, or ask about departments.`);
+  }
+}
+
+function listenMicrophone(announce = false) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    addLog("SpeechRecognition API not supported in this browser.");
-    speakText("Speech recognition is not supported in this browser.");
+    addLog("SpeechRecognition API not supported in this browser. Please use the quick prompt buttons or voice input below.");
+    if (announce) {
+      speakText("Speech recognition is not supported in this browser. You can use the voice command bar or quick buttons.");
+    }
     return;
   }
 
@@ -700,34 +1403,34 @@ function listenMicrophone() {
   recognition.lang = "en-US";
   recognition.interimResults = false;
 
-  addLog("Listening to microphone prompt...");
-  speakText("Listening for your voice prompt...");
+  addLog("🎤 Microphone listening for command... (Speak now)");
+  if (announce) {
+    speakText("Listening. Please say your prompt, such as 'I want to take admission'.");
+  }
+
+  const micBtn = document.getElementById("btn-listen-mic");
+  if (micBtn) micBtn.classList.add("active");
 
   recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript.toLowerCase();
-    addLog(`Heard Voice Prompt: '${transcript}'`);
-
-    let matchedTopic = null;
-    for (const [key, topic] of Object.entries(VOICE_KEYWORDS)) {
-      if (transcript.includes(key)) {
-        matchedTopic = topic;
-        break;
-      }
-    }
-
-    if (matchedTopic) {
-      addLog(`Matched Topic: ${matchedTopic}`);
-      speakText(`You asked about ${matchedTopic}. ${TOPICS[matchedTopic]}`);
-    } else {
-      speakText(`I heard: ${transcript}. Ask about admissions, departments, or campus tour.`);
-    }
+    if (micBtn) micBtn.classList.remove("active");
+    const transcript = event.results[0][0].transcript;
+    processVoiceCommand(transcript);
   };
 
   recognition.onerror = (event) => {
-    addLog(`Microphone Error: ${event.error}`);
+    if (micBtn) micBtn.classList.remove("active");
+    addLog(`Microphone Status: ${event.error}`);
   };
 
-  recognition.start();
+  recognition.onend = () => {
+    if (micBtn) micBtn.classList.remove("active");
+  };
+
+  try {
+    recognition.start();
+  } catch (err) {
+    addLog(`Mic Start Notice: ${err.message}`);
+  }
 }
 
 // ---------------------------------------------------------
@@ -934,15 +1637,14 @@ function updateVisitorAnimation() {
       activeVisitor.rotation.y = faceAngle;
 
       // Welcome Greeting Sequence
-      updateVisitorStatusBadge("👋 Visitor at window — Ask a topic!");
-      addLog("Visitor has arrived at vehicle window. Awaiting topic inquiry.");
-      const greetingMsg = "Hello! I'm touring DSA College today. Can you tell me about your Admissions or Student Projects?";
+      updateVisitorStatusBadge("👋 Visitor at window — Greeting visitor...");
+      addLog("Visitor arrived at vehicle window. Guide: 'Hello! Welcome to RBMI Group of Institutions. How can I help you today?'");
+      const greetingMsg = "Hello! Welcome to RBMI Group of Institutions. How can I help you today?";
       
       const speechBox = document.getElementById("speech-response-text");
-      if (speechBox) speechBox.innerText = `Visitor: "${greetingMsg}"`;
-      speakText(greetingMsg);
+      if (speechBox) speechBox.innerText = `Guide: "${greetingMsg}"`;
 
-      // Highlight topic buttons
+      // Highlight topic buttons for visual suggestion
       document.querySelectorAll(".btn-topic").forEach((btn) => {
         btn.style.animation = "topicHighlight 1s ease 2";
       });
@@ -951,6 +1653,15 @@ function updateVisitorAnimation() {
           btn.style.animation = "";
         });
       }, 2500);
+
+      // Greet the visitor, ask 'How can I help you?', and immediately open the microphone for command!
+      speakText(greetingMsg, () => {
+        if (activeVisitor && visitorPhase === "arrived") {
+          updateVisitorStatusBadge("👋 Visitor at window — 🎤 Listening for voice command...");
+          addLog("🎙️ Guide asked: 'How can I help you?' -> Opening microphone for command...");
+          listenMicrophone(false);
+        }
+      });
     }
   } else if (visitorPhase === "arrived") {
     // Gentle breathing animation while waiting
@@ -1027,7 +1738,31 @@ function removeVisitor(silent) {
 }
 
 function initUIEvents() {
-  window.addEventListener("keydown", (e) => { keys[e.code] = true; });
+  window.addEventListener("keydown", (e) => {
+    const tag = e.target.tagName ? e.target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea") {
+      if (e.code === "Enter" && e.target.id === "voice-cmd-input") {
+        document.getElementById("btn-voice-send")?.click();
+      }
+      return;
+    }
+
+    keys[e.code] = true;
+
+    // Keyboard Shortcuts
+    if (e.code === "KeyM") {
+      e.preventDefault();
+      listenMicrophone();
+    } else if (e.code === "KeyC") {
+      cameraMode = cameraMode === "chase" ? "orbit" : "chase";
+      addLog(`Camera Mode: ${cameraMode.toUpperCase()}`);
+    } else if (e.code === "KeyT") {
+      document.getElementById("btn-toggle-tts")?.click();
+    } else if (e.code === "KeyH") {
+      document.getElementById("btn-toggle-power")?.click();
+    }
+  });
+
   window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
   // Sidebar Tab Switching
@@ -1052,6 +1787,7 @@ function initUIEvents() {
 
   // Driving Mode Buttons
   document.getElementById("mode-manual")?.addEventListener("click", () => {
+    cancelNavigation();
     driveMode = "manual";
     document.getElementById("mode-manual").classList.add("active");
     document.getElementById("mode-autopilot").classList.remove("active");
@@ -1059,6 +1795,7 @@ function initUIEvents() {
   });
 
   document.getElementById("mode-autopilot")?.addEventListener("click", () => {
+    cancelNavigation();
     driveMode = "autopilot";
     document.getElementById("mode-autopilot").classList.add("active");
     document.getElementById("mode-manual").classList.remove("active");
@@ -1074,6 +1811,11 @@ function initUIEvents() {
   document.getElementById("cam-orbit")?.addEventListener("click", () => {
     cameraMode = "orbit";
     addLog("Camera Mode: FREE ORBIT");
+  });
+
+  document.getElementById("btn-toggle-cam")?.addEventListener("click", () => {
+    cameraMode = cameraMode === "chase" ? "orbit" : "chase";
+    addLog(`Camera Mode: ${cameraMode.toUpperCase()}`);
   });
 
   // Responsive On-Screen Drive Controls (Touch & Mouse)
@@ -1112,6 +1854,12 @@ function initUIEvents() {
     clearAllObstacles();
   });
 
+  // Cancel Navigation Button
+  document.getElementById("btn-cancel-nav")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    cancelNavigation();
+  });
+
   // Dismiss Visitor Button
   document.getElementById("btn-dismiss-visitor")?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1122,12 +1870,19 @@ function initUIEvents() {
     }
   });
 
+  // Topic Buttons
   document.querySelectorAll(".btn-topic").forEach((btn) => {
     btn.addEventListener("click", () => {
       const topic = btn.getAttribute("data-topic");
       if (TOPICS[topic]) {
         addLog(`Selected Topic: ${topic}`);
-        speakText(TOPICS[topic]);
+        if (topic === "Admissions") {
+          navigateToDestination("Admissions");
+        } else if (topic === "Student Cell") {
+          navigateToDestination("Student Cell");
+        } else {
+          speakText(TOPICS[topic]);
+        }
 
         // If a visitor is present and arrived, complete the interaction
         if (activeVisitor && visitorPhase === "arrived") {
@@ -1150,6 +1905,26 @@ function initUIEvents() {
       const selObjEl = document.getElementById("selected-obj-name");
       if (selObjEl) selObjEl.innerText = objName;
       addLog(`Selected Scene Object: ${objName}`);
+
+      if (objName === "Admissions_Building") {
+        navigateToDestination("Admissions");
+      } else if (objName === "Student_Cell") {
+        navigateToDestination("Student Cell");
+      } else if (objName === "Engineering_Hub") {
+        navigateToDestination("Departments");
+      } else if (objName === "AI_Robotics_Center") {
+        navigateToDestination("AI & Robotics");
+      }
+    });
+  });
+
+  // Mini-Nav Buttons in Campus Distance Monitor
+  document.querySelectorAll(".btn-mini-nav").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const navTarget = btn.getAttribute("data-nav");
+      if (navTarget && CAMPUS_DESTINATIONS[navTarget]) {
+        navigateToDestination(navTarget);
+      }
     });
   });
 
@@ -1168,6 +1943,27 @@ function initUIEvents() {
 
   document.getElementById("btn-listen-mic")?.addEventListener("click", () => {
     listenMicrophone();
+  });
+
+  // Voice Command Prompt Bar & Quick Chips
+  const voiceInput = document.getElementById("voice-cmd-input");
+  const voiceSendBtn = document.getElementById("btn-voice-send");
+  voiceSendBtn?.addEventListener("click", () => {
+    if (!voiceInput) return;
+    const text = voiceInput.value.trim();
+    if (text) {
+      processVoiceCommand(text);
+      voiceInput.value = "";
+    }
+  });
+
+  document.querySelectorAll(".chip-btn").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const cmd = chip.getAttribute("data-cmd");
+      if (cmd) {
+        processVoiceCommand(cmd);
+      }
+    });
   });
 
   document.getElementById("btn-toggle-tts")?.addEventListener("click", (e) => {
@@ -1209,6 +2005,21 @@ function animate() {
   if (hologramRobotGroup && isDisplayActive) {
     hologramRobotGroup.rotation.y += 0.018;
     hologramRobotGroup.position.y = Math.sin(performance.now() * 0.002) * 0.15;
+  }
+
+  // Animate glowing beacons for all 4 buildings
+  [admissionBeacon, studentCellBeacon, engineeringBeacon, aiRoboticsBeacon].forEach((b) => {
+    if (b && b.visible) {
+      b.rotation.y += 0.02;
+      if (b.material) {
+        b.material.opacity = 0.35 + Math.sin(performance.now() * 0.006) * 0.18;
+      }
+    }
+  });
+
+  // Real-time dynamic distance updates on 3D labels and UI
+  if (frameCount % 6 === 0) {
+    updateCampusDistances();
   }
 
   // Update visitor walking animation

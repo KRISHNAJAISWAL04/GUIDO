@@ -368,7 +368,7 @@ def draw_dashboard(
 
 def main() -> None:
     pygame.init()
-    pygame.display.set_caption("DSA College - Hologram Car Simulation & Testbed")
+    pygame.display.set_caption("RBMI Group of Institutions - Hologram Car Simulation & Testbed")
     screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
     clock = pygame.time.Clock()
     background = make_background()
@@ -408,6 +408,24 @@ def main() -> None:
     message = welcome_msg
     last_auto_trigger = 0.0
 
+    def _on_mic_input(topic: Optional[str], phrase: str):
+        nonlocal visitor, visitor_count, visitor_progress, active_topic, message
+        if topic:
+            if visitor is None:
+                visitor_count += 1
+                visitor = Visitor(visitor_count, config.VISITOR_NAMES[0])
+                visitor_progress = 0.0
+            active_topic = topic
+            if topic == "Admissions":
+                message = f"Moving to Admissions Center: '{phrase}' -> {config.TOPICS[topic]}"
+                voice.speak(f"Understood! Moving to the Admissions Center. {config.TOPICS[topic]}")
+            else:
+                message = f"Voice Request: '{phrase}' -> {config.TOPICS[topic]}"
+                voice.speak(config.TOPICS[topic])
+        else:
+            message = f"Heard: '{phrase}'. Could not match topic keyword."
+            voice.speak("I heard your voice, but couldn't match a topic.")
+
     running = True
 
     while running:
@@ -428,10 +446,10 @@ def main() -> None:
                 visitor_progress = 0.0
                 active_topic = None
                 message = (
-                    f"OpenCV detected a visitor! Welcome, {visitor.name}. "
-                    "Please select a topic or speak into the microphone."
+                    f"Hello {visitor.name}! Welcome to RBMI Group of Institutions. How can I help you?"
                 )
                 voice.speak(message)
+                voice.listen_in_background(callback=_on_mic_input)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -449,8 +467,9 @@ def main() -> None:
                     )
                     visitor_progress = 0.0
                     active_topic = None
-                    message = f"Welcome, {visitor.name}. Select a topic or press M to speak."
+                    message = f"Hello {visitor.name}! Welcome to RBMI Group of Institutions. How can I help you?"
                     voice.speak(message)
+                    voice.listen_in_background(callback=_on_mic_input)
 
                 elif event.key == pygame.K_c:
                     msg = vision.cycle_mode()
@@ -458,20 +477,6 @@ def main() -> None:
                     voice.speak(msg)
 
                 elif event.key == pygame.K_m:
-                    def _on_mic_input(topic: Optional[str], phrase: str):
-                        nonlocal visitor, visitor_count, visitor_progress, active_topic, message
-                        if topic:
-                            if visitor is None:
-                                visitor_count += 1
-                                visitor = Visitor(visitor_count, config.VISITOR_NAMES[0])
-                                visitor_progress = 0.0
-                            active_topic = topic
-                            message = f"Voice Request: '{phrase}' -> {config.TOPICS[topic]}"
-                            voice.speak(config.TOPICS[topic])
-                        else:
-                            message = f"Heard: '{phrase}'. Could not match topic keyword."
-                            voice.speak("I heard your voice, but couldn't match a topic.")
-
                     message = "Listening for microphone speech command..."
                     voice.listen_in_background(callback=_on_mic_input)
 

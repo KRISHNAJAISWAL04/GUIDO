@@ -9,7 +9,7 @@ WIDTH = 1280
 HEIGHT = 760
 FPS = 60
 
-COLLEGE_NAME = "DSA Innovation College"
+COLLEGE_NAME = "RBMI Group of Institutions"
 DISPLAY_NAME = "Autonomous Hologram Guide"
 
 # Color Palette (Futuristic Dark UI Theme)
@@ -30,8 +30,12 @@ DARK_CARD = (7, 21, 33)
 # College Q&A Topics
 TOPICS = {
     "Admissions": (
-        "Welcome to DSA College. Admissions are open for engineering and technology. "
+        "Welcome to RBMI Group of Institutions. Admissions are open for engineering, management, and technology. "
         "Eligibility requires 60% aggregate with Mathematics and Science."
+    ),
+    "Student Cell": (
+        "The Student Cell at RBMI assists students with scholarships, student welfare, "
+        "hostel allocations, academic counseling, and extracurricular initiatives."
     ),
     "Departments": (
         "We offer Computer Science, AI & Data Science, Robotics, Mechanical, "
@@ -49,8 +53,12 @@ TOPICS = {
         "The AI & Robotics Center is equipped with GPU clusters, ROS manipulators, "
         "OpenCV vision rigs, and autonomous mobile robot prototyping kits."
     ),
+    "Campus Distance": (
+        "The campus buildings are situated 90 meters apart from each other in a quadrant grid, "
+        "interconnected by paved 10m boulevards, diagonal avenues, and perimeter ring roads."
+    ),
     "Contact Us": (
-        "Reach out at reception@dsacollege.edu or call +91-98765-43210. "
+        "Reach out at reception@rbmi.in or call +91-98765-43210. "
         "Scan the QR code on the dashboard for map directions."
     ),
 }
@@ -81,6 +89,19 @@ VOICE_KEYWORDS = {
     "admission": "Admissions",
     "apply": "Admissions",
     "admissions": "Admissions",
+    "admission hub": "Admissions",
+    "admissions hub": "Admissions",
+    "take admission": "Admissions",
+    "want admission": "Admissions",
+    "take to admission": "Admissions",
+    "admission center": "Admissions",
+    "i want to take admission": "Admissions",
+    "student cell": "Student Cell",
+    "students cell": "Student Cell",
+    "student welfare": "Student Cell",
+    "scholarship": "Student Cell",
+    "scholarships": "Student Cell",
+    "welfare": "Student Cell",
     "department": "Departments",
     "departments": "Departments",
     "course": "Departments",
@@ -96,4 +117,7 @@ VOICE_KEYWORDS = {
     "phone": "Contact Us",
     "email": "Contact Us",
     "reception": "Contact Us",
+    "distance": "Campus Distance",
+    "distance between buildings": "Campus Distance",
+    "how far": "Campus Distance",
 }

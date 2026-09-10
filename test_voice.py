@@ -27,7 +27,7 @@ def main() -> None:
     voice = VoiceEngine()
 
     sample_phrases = [
-        "Welcome to DSA Innovation College.",
+        "Welcome to RBMI Group of Institutions.",
         "OpenCV object detection is currently online.",
         "Please choose a topic or speak into your microphone.",
     ]

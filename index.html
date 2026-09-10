@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blender 3D Studio - Hologram Autonomous Car Simulation</title>
+  <title>RBMI Group of Institutions - Hologram Autonomous Car Simulation</title>
   <link rel="stylesheet" href="style.css?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
   <header class="app-header">
     <div class="brand">
       <span class="brand-badge">BLENDER 3D</span>
-      <h1>DSA College &bull; Autonomous Car & Obstacle Avoidance Simulation</h1>
+      <h1>RBMI Group of Institutions &bull; Autonomous Car & Obstacle Avoidance Simulation</h1>
     </div>
 
     <div class="toolbar">
@@ -126,6 +126,13 @@
           </div>
           <div class="card-body">
 
+            <!-- Navigation Status Badge -->
+            <div class="nav-status-badge" id="nav-status-badge" style="display: none;">
+              <span class="pulse-dot-cyan"></span>
+              <span class="nav-status-text" id="nav-status-text">Navigating to Admissions Center...</span>
+              <button class="btn-cancel-nav" id="btn-cancel-nav" title="Cancel Navigation">✕</button>
+            </div>
+
             <!-- Visitor Status Badge -->
             <div class="visitor-status-badge" id="visitor-status-badge" style="display: none;">
               <span class="pulse-dot"></span>
@@ -135,6 +142,7 @@
 
             <div class="topic-grid">
               <button class="btn btn-topic" data-topic="Admissions" tabindex="0">🎓 Admissions</button>
+              <button class="btn btn-topic" data-topic="Student Cell" tabindex="0">📋 Student Cell</button>
               <button class="btn btn-topic" data-topic="Departments" tabindex="0">🏫 Departments</button>
               <button class="btn btn-topic" data-topic="Student Projects" tabindex="0">🔧 Projects</button>
               <button class="btn btn-topic" data-topic="Campus Tour" tabindex="0">🗺️ Campus Tour</button>
@@ -144,7 +152,108 @@
 
             <div class="response-box">
               <span class="response-label">HOLOGRAM SPEECH RESPONSE:</span>
-              <p id="speech-response-text">Use WASD to drive. Forward obstacle sensor is active.</p>
+              <p id="speech-response-text">Use WASD to drive or say "I want to take admission" to navigate.</p>
+            </div>
+
+            <!-- Voice Command Prompt Bar & Quick Test Chips -->
+            <div class="voice-cmd-box">
+              <span class="voice-cmd-label">🎙️ VOICE COMMAND (SPEAK OR TYPE):</span>
+              <div class="voice-input-row">
+                <input type="text" id="voice-cmd-input" placeholder="Say or type 'I want to take admission'..." autocomplete="off" />
+                <button class="btn-voice-send" id="btn-voice-send" title="Run Voice Command">➤</button>
+              </div>
+              <div class="voice-chips">
+                <button class="chip-btn highlight" data-cmd="I want to take admission">🎓 "Take Admission"</button>
+                <button class="chip-btn highlight" data-cmd="Go to Student Cell">📋 "Go to Student Cell"</button>
+                <button class="chip-btn" data-cmd="What is the distance between buildings?">📏 "Building Distances"</button>
+                <button class="chip-btn" data-cmd="Take me to Engineering Hub">🏫 "Go to Engineering"</button>
+                <button class="chip-btn" data-cmd="Take me to AI Robotics Hub">🤖 "Go to AI Hub"</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Campus Distance Monitor Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📏 CAMPUS DISTANCE MONITOR</h3>
+          </div>
+          <div class="card-body">
+            <div class="distance-list">
+              <div class="dist-row">
+                <div class="dist-info">
+                  <span class="dist-name">🎓 Admissions Center</span>
+                  <span class="dist-val" id="dist-val-admissions">-- m</span>
+                </div>
+                <button class="btn-mini-nav" data-nav="Admissions">NAVIGATE</button>
+              </div>
+              <div class="dist-row">
+                <div class="dist-info">
+                  <span class="dist-name">📋 Student Cell</span>
+                  <span class="dist-val" id="dist-val-studentcell">-- m</span>
+                </div>
+                <button class="btn-mini-nav" data-nav="Student Cell">NAVIGATE</button>
+              </div>
+              <div class="dist-row">
+                <div class="dist-info">
+                  <span class="dist-name">🏫 Engineering Hub</span>
+                  <span class="dist-val" id="dist-val-engineering">-- m</span>
+                </div>
+                <button class="btn-mini-nav" data-nav="Departments">NAVIGATE</button>
+              </div>
+              <div class="dist-row">
+                <div class="dist-info">
+                  <span class="dist-name">🤖 AI &amp; Robotics Hub</span>
+                  <span class="dist-val" id="dist-val-airobotics">-- m</span>
+                </div>
+                <button class="btn-mini-nav" data-nav="AI & Robotics">NAVIGATE</button>
+              </div>
+            </div>
+
+            <!-- Inter-Building Distance Matrix -->
+            <div class="distance-matrix-box">
+              <span class="dist-matrix-title">INTER-BUILDING DISTANCE MATRIX:</span>
+              <table class="dist-table">
+                <thead>
+                  <tr>
+                    <th>From \ To</th>
+                    <th>Adm</th>
+                    <th>Cell</th>
+                    <th>Eng</th>
+                    <th>AI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Admissions</td>
+                    <td>—</td>
+                    <td>90m</td>
+                    <td>90m</td>
+                    <td>127m</td>
+                  </tr>
+                  <tr>
+                    <td>Student Cell</td>
+                    <td>90m</td>
+                    <td>—</td>
+                    <td>127m</td>
+                    <td>90m</td>
+                  </tr>
+                  <tr>
+                    <td>Engineering</td>
+                    <td>90m</td>
+                    <td>127m</td>
+                    <td>—</td>
+                    <td>90m</td>
+                  </tr>
+                  <tr>
+                    <td>AI Robotics</td>
+                    <td>127m</td>
+                    <td>90m</td>
+                    <td>90m</td>
+                    <td>—</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -181,6 +290,7 @@
               <li data-obj="Hologram_Fan_Rig">🌀 Hologram_Fan_Rig</li>
               <li data-obj="Laser_Sensor_Beam">🔴 Laser_Sensor_Beam</li>
               <li data-obj="Admissions_Building">🏛️ Admissions_Building</li>
+              <li data-obj="Student_Cell">📋 Student_Cell</li>
               <li data-obj="Engineering_Hub">🏫 Engineering_Hub</li>
               <li data-obj="AI_Robotics_Center">🔬 AI_Robotics_Center</li>
             </ul>
