@@ -1096,46 +1096,6 @@ function checkLandmarkProximity() {
   });
 }
 
-function initWebCam() {
-  const video = document.getElementById("webcam-video");
-  const canvas = document.getElementById("detection-canvas");
-  const ctx = canvas.getContext("2d");
-
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        video.srcObject = stream;
-        addLog("WebCam Feed initialized successfully.");
-      })
-      .catch((err) => {
-        addLog(`WebCam Warning: ${err.message}. Running in Synthetic Vision Mode.`);
-      });
-  }
-
-  let synthAngle = 0;
-  function processVisionFrame() {
-    canvas.width = video.videoWidth || 240;
-    canvas.height = video.videoHeight || 140;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    synthAngle += 0.04;
-    const cx = canvas.width / 2 + Math.sin(synthAngle) * 60;
-    const cy = canvas.height / 2 + Math.cos(synthAngle * 0.7) * 25;
-
-    ctx.strokeStyle = "#00e6ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cx - 35, cy - 35, 70, 70);
-
-    ctx.fillStyle = "#00e6ff";
-    ctx.font = "10px JetBrains Mono";
-    ctx.fillText("TARGET DETECTED", cx - 35, cy - 40);
-
-    requestAnimationFrame(processVisionFrame);
-  }
-  processVisionFrame();
-}
-
 function speakText(text, onEndCallback) {
   const responseEl = document.getElementById("speech-response-text");
   if (responseEl) responseEl.innerText = text;
@@ -2048,7 +2008,6 @@ function animate() {
 
 window.addEventListener("DOMContentLoaded", () => {
   init3DViewport();
-  initWebCam();
   initUIEvents();
   animate();
   speakText("Obstacle detection sensor active. Drive with WASD keys or click Spawn Obstacle.");
